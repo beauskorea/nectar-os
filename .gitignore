@@ -1,0 +1,14 @@
+node_modules/
+.next/
+.env
+.env.local
+.env.*.local
+data/
+public/files/
+public/*.json
+!public/manifest.json
+src/data/*.json
+src/data/*.bak*
+*.log
+.DS_Store
+tsconfig.tsbuildinfo
