@@ -63,10 +63,11 @@ type CalendarGroup = {
   meta: { label: string; emoji: string; dot: string; text: string };
   items: CalEvent[];
   today: number;
+  tomorrow: number;
   meetings: number;
 };
 
-function groupByCalendar(items: CalEvent[], todayKey: string): CalendarGroup[] {
+function groupByCalendar(items: CalEvent[], todayKey: string, tomorrowKey: string): CalendarGroup[] {
   const byCal = new Map<string, CalEvent[]>();
   for (const e of items) {
     if (e.cal === "holiday") continue;
@@ -80,9 +81,10 @@ function groupByCalendar(items: CalEvent[], todayKey: string): CalendarGroup[] {
       meta: TEAM_LABELS[cal] || { label: cal, emoji: "📌", dot: "bg-zinc-500", text: "text-zinc-400" },
       items: calItems,
       today: calItems.filter((e) => (e.start.length === 10 ? e.start : ymd(parseDateLocal(e.start))) === todayKey).length,
+      tomorrow: calItems.filter((e) => (e.start.length === 10 ? e.start : ymd(parseDateLocal(e.start))) === tomorrowKey).length,
       meetings: calItems.filter((e) => isMeeting(e.title)).length,
     }))
-    .sort((a, b) => b.today - a.today || b.items.length - a.items.length || a.meta.label.localeCompare(b.meta.label));
+    .sort((a, b) => (b.today + b.tomorrow) - (a.today + a.tomorrow) || b.items.length - a.items.length || a.meta.label.localeCompare(b.meta.label));
 }
 
 export default function HomeTeamCalendar() {
@@ -120,6 +122,8 @@ export default function HomeTeamCalendar() {
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
     const weekEnd = new Date(todayStart);
     weekEnd.setDate(weekEnd.getDate() + 7);
+    const tomorrowEnd = new Date(todayStart);
+    tomorrowEnd.setDate(tomorrowEnd.getDate() + 2);
 
     const upcoming = events
       .filter((e) => {
@@ -129,13 +133,17 @@ export default function HomeTeamCalendar() {
       .sort((a, b) => parseDateLocal(a.start).getTime() - parseDateLocal(b.start).getTime());
 
     const representative = upcoming.filter(isRepEvent);
-    const company = upcoming.filter((e) => e.cal !== "holiday" && !isRepEvent(e));
+    const company = upcoming.filter((e) => {
+      if (e.cal === "holiday" || isRepEvent(e)) return false;
+      const start = parseDateLocal(e.start).getTime();
+      return start < tomorrowEnd.getTime();
+    });
 
     return {
-      representative: groupByCalendar(representative, todayKey),
-      company: groupByCalendar(company, todayKey),
+      representative: groupByCalendar(representative, todayKey, tomorrowKey),
+      company: groupByCalendar(company, todayKey, tomorrowKey),
     };
-  }, [events, now, todayKey]);
+  }, [events, now, todayKey, tomorrowKey]);
 
   const buckets = [
     {
@@ -147,9 +155,9 @@ export default function HomeTeamCalendar() {
     },
     {
       key: "company",
-      title: "🏢 회사 달력",
+      title: "🏢 회사 달력 오늘·내일",
       href: "/calendar/company",
-      hint: "팀·콘텐츠·협업",
+      hint: "회사 전체 · 내 스케줄 제외",
       groups: split.company,
     },
   ];
@@ -174,6 +182,7 @@ export default function HomeTeamCalendar() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {buckets.map((bucket) => {
           const bucketTotal = bucket.groups.reduce((sum, g) => sum + g.items.length, 0);
+          const bucketTomorrow = bucket.groups.reduce((sum, g) => sum + g.tomorrow, 0);
           const visibleGroups = showAll ? bucket.groups : bucket.groups.slice(0, 3);
           return (
             <section key={bucket.key} className="min-w-0">
@@ -183,7 +192,7 @@ export default function HomeTeamCalendar() {
                   <p className="text-[10px] text-zinc-600 mt-0.5">{bucket.hint}</p>
                 </div>
                 <span className="text-[10px] text-zinc-600 font-mono">
-                  {bucketTotal} events →
+                  {bucketTotal} events{bucket.key === "company" ? ` · 내일 ${bucketTomorrow}` : ""} →
                 </span>
               </a>
               {bucketTotal === 0 ? (
@@ -195,7 +204,10 @@ export default function HomeTeamCalendar() {
                       <div className="flex items-baseline justify-between mb-1.5">
                         <p className={`text-[11px] uppercase tracking-wider font-semibold ${group.meta.text}`}>
                           {group.meta.emoji} {group.meta.label}
-                          <span className="text-zinc-600 font-normal"> · 오늘 {group.today} · 7일 {group.items.length}</span>
+                          <span className="text-zinc-600 font-normal">
+                            {" "}· 오늘 {group.today} · 내일 {group.tomorrow}
+                            {bucket.key !== "company" && ` · 7일 ${group.items.length}`}
+                          </span>
                         </p>
                         {group.meetings > 0 && <span className="text-[10px] text-zinc-600 font-mono">{group.meetings} mtg</span>}
                       </div>
