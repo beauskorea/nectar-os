@@ -1,7 +1,6 @@
 import { getDefaultMoneyKpi } from "@/lib/finance";
 const moneyKpi = getDefaultMoneyKpi();
 import InboxRecentCard from "@/components/InboxRecentCard";
-import OverduePeopleCard from "@/components/OverduePeopleCard";
 import TodayIntention from "@/components/TodayIntention";
 import NextEventsCard from "@/components/NextEventsCard";
 import MailDigestWidget from "@/components/MailDigestWidget";
@@ -96,10 +95,9 @@ export default function Today() {
         </div>
       </section>
 
-      {/* ───── 👥 사람 & 인박스 ───── */}
-      <SectionLabel emoji="👥" title="사람 & 인박스" hint="overdue · mail · inbox" />
-      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 auto-rows-fr gap-4">
-        <OverduePeopleCard />
+      {/* ───── 📥 인박스 ───── */}
+      <SectionLabel emoji="📥" title="인박스" hint="mail · capture" />
+      <section className="grid grid-cols-1 md:grid-cols-2 auto-rows-fr gap-4">
         <Card title="📧 메일 다이제스트" hint="live">
           <MailDigestWidget />
         </Card>
