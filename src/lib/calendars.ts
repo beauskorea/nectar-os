@@ -29,6 +29,20 @@ export const CALENDARS: Record<string, CalendarMeta> = {
     chipText: "text-cyan-50",
     dotBg: "bg-cyan-400",
   },
+  mgmt_team: {
+    key: "mgmt_team",
+    label: "매니지먼트팀",
+    chipBg: "bg-teal-700/70",
+    chipText: "text-teal-50",
+    dotBg: "bg-teal-400",
+  },
+  sonjuhee_just: {
+    key: "sonjuhee_just",
+    label: "손주희",
+    chipBg: "bg-violet-700/70",
+    chipText: "text-violet-50",
+    dotBg: "bg-violet-400",
+  },
   holiday: {
     key: "holiday",
     label: "대한민국 휴일",
@@ -45,7 +59,15 @@ export const CALENDARS: Record<string, CalendarMeta> = {
   },
 };
 
-export const CAL_ORDER: string[] = ["beauskorea", "beautysketch", "beauscontents", "holiday", "quick"];
+export const CAL_ORDER: string[] = [
+  "beauskorea",
+  "beautysketch",
+  "beauscontents",
+  "mgmt_team",
+  "sonjuhee_just",
+  "holiday",
+  "quick",
+];
 
 export type CalEvent = {
   id: string;

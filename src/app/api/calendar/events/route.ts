@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { promises as fs } from "node:fs";
-import path from "node:path";
+import { fileURLToPath } from "node:url";
 import zlib from "node:zlib";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const EVENTS_PATH =
-  process.env.EVENTS_JSON_PATH || path.join(/* turbopackIgnore: true */ process.cwd(), "public", "events.json");
+  process.env.EVENTS_JSON_PATH ||
+  fileURLToPath(new URL("../../../../../public/events.json", import.meta.url));
 const MINE_CALENDARS = new Set(["beauskorea", "personal", "private", "primary", "jinho"]);
 const TEAM_EXCLUDED_CALENDARS = new Set(["holiday", "quick", ...MINE_CALENDARS]);
 

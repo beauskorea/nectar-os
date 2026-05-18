@@ -9,6 +9,9 @@
 import { parseEmailToTransaction } from "./parser";
 import type { ParseInput, Transaction } from "./types";
 import { GMAIL_EMAIL_SAMPLES } from "./samples/email-samples";
+import { existsSync } from "node:fs";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 export type GmailFetchMode = "mock" | "live";
 
@@ -77,8 +80,9 @@ export async function fetchGmailTransactions(
   // live 모드 — gmail-live.ts (Google API client) 를 동적 import.
   // 이 파일이 아직 없으면 catch 해서 mock fallback.
   try {
-    // @ts-expect-error — gmail-live.ts 는 OAuth 토큰 붙는 시점에 생성
-    const live = await import("./gmail-live");
+    const livePath = path.join(process.cwd(), "src", "lib", "finance", "gmail-live.ts");
+    if (!existsSync(livePath)) throw new Error("gmail-live.ts missing");
+    const live = await import(pathToFileURL(livePath).href);
     if (typeof live.fetchGmailLive === "function") {
       return (await live.fetchGmailLive(opts)) as GmailFetchResult;
     }

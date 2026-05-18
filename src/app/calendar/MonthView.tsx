@@ -50,6 +50,11 @@ const SOFT_KEYWORDS = [
   "런치", "디너", "회식", "식사",
 ];
 
+const HOLIDAY_KEYWORDS = [
+  "공휴일", "대체공휴일", "부처님오신날", "석가탄신일", "설날", "추석",
+  "어린이날", "현충일", "광복절", "개천절", "한글날", "성탄절",
+];
+
 function normalizeTitle(t: string): string {
   return (t || "")
     .replace(/[(\[].*?[)\]]/g, "")
@@ -58,11 +63,16 @@ function normalizeTitle(t: string): string {
     .trim();
 }
 
+function isHolidayEvent(e: CalEvent): boolean {
+  return e.cal === "holiday" || HOLIDAY_KEYWORDS.some((kw) => (e.title || "").includes(kw));
+}
+
 function isSpecialMain(
   e: CalEvent,
   freq: Record<string, number>,
 ): boolean {
   const t = e.title || "";
+  if (isHolidayEvent(e)) return false;
   // 블랙리스트 — 명백한 정기 회의/루틴 제외
   if (RECURRING_BLACKLIST.some((kw) => t.includes(kw))) return false;
   // 빈도 ≥ 3 → 정기 회의로 간주 → 제외
@@ -87,13 +97,19 @@ function formatHM(s: string) {
   return m === 0 ? `${ampm} ${h12}시` : `${ampm} ${h12}:${String(m).padStart(2, "0")}`;
 }
 
+function calendarMeta(cal: string) {
+  return CALENDARS[cal] || {
+    key: cal,
+    label: cal,
+    chipBg: "bg-zinc-800/80",
+    chipText: "text-zinc-200",
+    dotBg: "bg-zinc-500",
+  };
+}
+
 export default function MonthView({ events }: { events: CalEvent[] }) {
   const today = new Date();
   const [cursor, setCursor] = useState<Date>(new Date(2026, 4, 1)); // May 2026 default
-  const [enabled, setEnabled] = useState<Record<string, boolean>>(
-    Object.fromEntries(CAL_ORDER.map((k) => [k, true])),
-  );
-
   const [quickEvents, setQuickEvents] = useState<CalEvent[]>([]);
   useEffect(() => {
     const reload = () => {
@@ -118,6 +134,16 @@ export default function MonthView({ events }: { events: CalEvent[] }) {
     };
   }, []);
   const allEvents = useMemo(() => [...events, ...quickEvents], [events, quickEvents]);
+  const calendarKeys = useMemo(() => {
+    const keys = new Set(CAL_ORDER);
+    for (const event of allEvents) {
+      if (event.cal) keys.add(event.cal);
+    }
+    return Array.from(keys);
+  }, [allEvents]);
+  const [enabled, setEnabled] = useState<Record<string, boolean>>(
+    Object.fromEntries(CAL_ORDER.map((k) => [k, true])),
+  );
 
   const gs = useMemo(() => gridStart(cursor), [cursor]);
   const days: Date[] = useMemo(
@@ -129,7 +155,7 @@ export default function MonthView({ events }: { events: CalEvent[] }) {
   const eventsByDay = useMemo(() => {
     const map: Record<string, CalEvent[]> = {};
     for (const e of allEvents) {
-      if (!enabled[e.cal]) continue;
+      if (enabled[e.cal] === false) continue;
       const s = parseDateLocal(e.start);
       const eEnd = parseDateLocal(e.end);
       // end is exclusive for all-day; for timed treat as same day
@@ -153,14 +179,34 @@ export default function MonthView({ events }: { events: CalEvent[] }) {
   }, [allEvents, enabled]);
 
   const monthLabel = `${cursor.getFullYear()}년 ${cursor.getMonth() + 1}월`;
+  const todayKey = ymd(today);
+  const tomorrow = addDays(today, 1);
+  const tomorrowKey = ymd(tomorrow);
+  const freq: Record<string, number> = {};
+  for (const ev of allEvents) {
+    const k = normalizeTitle(ev.title);
+    if (k) freq[k] = (freq[k] || 0) + 1;
+  }
+  const todayList = (eventsByDay[todayKey] || []).filter((e) => !isHolidayEvent(e));
+  const tomorrowList = (eventsByDay[tomorrowKey] || []).filter((e) => !isHolidayEvent(e));
+  const tomorrowImportant = tomorrowList.filter((e) => isSpecialMain(e, freq));
+  const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const weekEnd = addDays(todayMid, 7);
+  const weekMain = allEvents
+    .filter((e) => enabled[e.cal] !== false && !isHolidayEvent(e))
+    .filter((e) => {
+      const s = parseDateLocal(e.start);
+      return s >= todayMid && s < weekEnd && isSpecialMain(e, freq);
+    })
+    .sort((a, b) => a.start.localeCompare(b.start));
 
   return (
     <div className="flex gap-3">
       {/* sidebar — mini cal toggles (compact) */}
       <aside className="w-36 shrink-0 space-y-0.5">
         <p className="text-[9px] uppercase tracking-wider text-zinc-600 mb-1">내 캘린더</p>
-        {CAL_ORDER.map((k) => {
-          const c = CALENDARS[k];
+        {calendarKeys.map((k) => {
+          const c = calendarMeta(k);
           const on = enabled[k];
           return (
             <button
@@ -189,14 +235,13 @@ export default function MonthView({ events }: { events: CalEvent[] }) {
             📍 오늘 {today.getMonth() + 1}/{today.getDate()}
           </p>
           {(() => {
-            const list = eventsByDay[ymd(today)] || [];
-            if (list.length === 0) {
+            if (todayList.length === 0) {
               return <p className="text-[10px] text-zinc-600 italic">일정 없음</p>;
             }
             return (
               <div className="space-y-1">
-                {list.slice(0, 12).map((e, i) => {
-                  const c = CALENDARS[e.cal];
+                {todayList.slice(0, 12).map((e, i) => {
+                  const c = calendarMeta(e.cal);
                   return (
                     <div
                       key={`tod-${e.id}-${i}`}
@@ -215,12 +260,54 @@ export default function MonthView({ events }: { events: CalEvent[] }) {
                     </div>
                   );
                 })}
-                {list.length > 12 && (
-                  <p className="text-[10px] text-zinc-600">+{list.length - 12} more</p>
+                {todayList.length > 12 && (
+                  <p className="text-[10px] text-zinc-600">+{todayList.length - 12} more</p>
                 )}
               </div>
             );
           })()}
+        </div>
+
+        <div className="pt-3 mt-3 border-t border-amber-900/60">
+          <div className="flex items-baseline justify-between gap-2 mb-1.5">
+            <p className="text-[10px] uppercase tracking-wider text-amber-400 font-semibold">
+              📌 내일 {tomorrow.getMonth() + 1}/{tomorrow.getDate()}
+            </p>
+            <span className="text-[9px] text-zinc-600 font-mono">
+              중요 {tomorrowImportant.length}
+            </span>
+          </div>
+          {tomorrowList.length === 0 ? (
+            <p className="text-[10px] text-zinc-600 italic">일정 없음</p>
+          ) : (
+            <div className="space-y-1">
+              {tomorrowList.slice(0, 12).map((e, i) => {
+                const c = calendarMeta(e.cal);
+                const important = isSpecialMain(e, freq);
+                return (
+                  <div
+                    key={`tom-${e.id}-${i}`}
+                    className="flex items-start gap-1.5 text-[11px] leading-tight"
+                    title={`${e.allDay ? "종일" : formatHM(e.start)} · ${e.title}`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1.5 ${important ? "bg-amber-400" : c.dotBg}`} />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-zinc-500 font-mono text-[10px] block">
+                        {e.allDay ? "종일" : formatHM(e.start)}
+                        {important && <span className="text-amber-400"> · 중요</span>}
+                      </span>
+                      <span className={important ? "text-amber-100 break-words" : "text-zinc-200 break-words"}>
+                        {e.title}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+              {tomorrowList.length > 12 && (
+                <p className="text-[10px] text-zinc-600">+{tomorrowList.length - 12} more</p>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="pt-3 mt-3 border-t border-violet-900/60">
@@ -228,28 +315,13 @@ export default function MonthView({ events }: { events: CalEvent[] }) {
             📋 이번주 메인
           </p>
           {(() => {
-            const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-            const weekEnd = addDays(todayMid, 7);
-            // 빈도 카운트는 전체 events에서 (정기 회의 패턴 탐지)
-            const freq: Record<string, number> = {};
-            for (const ev of allEvents) {
-              const k = normalizeTitle(ev.title);
-              if (k) freq[k] = (freq[k] || 0) + 1;
-            }
-            const main = allEvents
-              .filter((e) => enabled[e.cal] !== false)
-              .filter((e) => {
-                const s = parseDateLocal(e.start);
-                return s >= todayMid && s < weekEnd && isSpecialMain(e, freq);
-              })
-              .sort((a, b) => a.start.localeCompare(b.start));
-            if (main.length === 0) {
+            if (weekMain.length === 0) {
               return <p className="text-[10px] text-zinc-600 italic">메인 일정 없음</p>;
             }
             return (
               <div className="space-y-1.5">
-                {main.slice(0, 20).map((e, i) => {
-                  const c = CALENDARS[e.cal] || CALENDARS.beautysketch;
+                {weekMain.slice(0, 20).map((e, i) => {
+                  const c = calendarMeta(e.cal);
                   const d = parseDateLocal(e.start);
                   const md = `${d.getMonth() + 1}/${d.getDate()}`;
                   const weekday = WEEKDAYS[d.getDay()];
@@ -274,8 +346,8 @@ export default function MonthView({ events }: { events: CalEvent[] }) {
                     </div>
                   );
                 })}
-                {main.length > 20 && (
-                  <p className="text-[10px] text-zinc-600">+{main.length - 20} more</p>
+                {weekMain.length > 20 && (
+                  <p className="text-[10px] text-zinc-600">+{weekMain.length - 20} more</p>
                 )}
               </div>
             );
@@ -350,7 +422,7 @@ export default function MonthView({ events }: { events: CalEvent[] }) {
                 </div>
                 <div className="space-y-px flex-1 overflow-y-auto min-h-0 calendar-cell-scroll">
                   {list.slice(0, 12).map((e, idx) => {
-                    const c = CALENDARS[e.cal];
+                    const c = calendarMeta(e.cal);
                     if (e.allDay) {
                       return (
                         <div
