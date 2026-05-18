@@ -18,6 +18,8 @@ ENV_PATH = Path("/root/jinho-playground/.env.local")
 MODEL = "claude-sonnet-4-6"
 FALLBACK_MODEL = "claude-opus-4-7"
 
+DELETE_WORDS = ("삭제", "지워", "빼", "제거", "없애")
+
 
 def load_env():
     env = {}
@@ -72,17 +74,34 @@ def sections_to_sheet_text(sections):
     return "\n".join(out).strip()
 
 
+def is_section_delete(prompt: str, *names: str) -> bool:
+    compact = prompt.replace(" ", "")
+    return any(name.replace(" ", "") in compact for name in names) and any(w in prompt for w in DELETE_WORDS)
+
+
+def without_redundant_sections(sections, *names: str, emojis=()):
+    compact_names = [name.replace(" ", "") for name in names]
+    return [
+        s for s in sections
+        if not (
+            s.get("emoji") in emojis
+            or any(name in str(s.get("title", "")).replace(" ", "") for name in compact_names)
+        )
+    ]
+
+
 SYS_FULL = """너는 박진호 대표(뷰스컴퍼니/비라운드)의 주간회의 초안 어시스턴트.
 사용자가 기존 초안에 대한 수정 지시를 준다.
 지시를 반영해 전체 sections 배열을 다시 출력한다.
 
 규칙:
 1. 한국어. 결론·팩트 우선. 추측·과장 금지.
-2. 카테고리 순서: 📊 매출/수치 → 📌 핵심이슈 → 💼 영업관리 → 🚀 New BM → 🛠️ 고정TF → 👤 비라운드/발굴 크리에이터 → 🏢 내부사항 → ⭐ 팔로업
+2. 카테고리 순서: 📊 매출/수치 → 📌 핵심이슈 → 🚀 New BM → 👤 비라운드/발굴 크리에이터 → 🏢 내부사항
 3. 각 섹션 body 패턴: "1. 주요항목\\n  ㄴ 세부\\n  → 다음 단계"
 4. 연계팀(제니하우스 ↔ 커머스팀) 등장 시 짝꿍 명시.
 5. 사용자 지시에 명확히 반영된 변경만. 다른 섹션은 가급적 유지.
-6. JSON으로만 출력. 코드펜스 금지.
+6. 기존 "영업관리", "고정TF", "팔로업" 섹션은 삭제하고 새로 생성하지 않는다. 회사 전체 영업관리·파이프라인·미팅 리스트, 정기 TF/주간회의 묶음, 마감/대표 액션 목록은 대표 세부 스케줄 sections에 두지 않는다.
+7. JSON으로만 출력. 코드펜스 금지.
 
 스키마:
 {
@@ -99,7 +118,8 @@ SYS_SECTION = """너는 박진호 대표의 주간회의 초안 어시스턴트.
 2. body 패턴 유지: "1. 주요항목\\n  ㄴ 세부\\n  → 다음 단계"
 3. 사용자 지시 반영 + 기존 좋은 내용은 보존.
 4. 연계팀(제니하우스 ↔ 커머스팀) 등장 시 짝꿍 명시.
-5. JSON으로만 출력. 코드펜스 금지.
+5. 섹션 제목을 "영업관리", "고정TF", "팔로업"으로 바꾸지 않는다. 회사 전체 영업관리·파이프라인·미팅 리스트, 정기 TF/주간회의 묶음, 마감/대표 액션 목록은 대표 세부 스케줄 섹션에 추가하지 않는다.
+6. JSON으로만 출력. 코드펜스 금지.
 
 스키마:
 {"emoji":"...","title":"...","body":"..."}"""
@@ -127,6 +147,28 @@ def main():
         return 1
 
     sections = block.get("sections") or []
+
+    if is_section_delete(prompt, "영업관리", "영업 관리", "고정TF", "고정 TF", "팔로업"):
+        new_sections = without_redundant_sections(
+            sections,
+            "영업관리",
+            "고정TF",
+            "팔로업",
+            emojis=("💼", "🛠️", "🛠", "⭐"),
+        )
+        if len(new_sections) != len(sections):
+            block["sections"] = new_sections
+            block["sheetText"] = sections_to_sheet_text(new_sections)
+            DRAFT_PATH.write_text(json.dumps(draft, ensure_ascii=False, indent=2), encoding="utf-8")
+            print(json.dumps({
+                "ok": True,
+                "scope": scope,
+                "revised": "delete_redundant_sections",
+                "sectionIndex": section_idx,
+                "headline": block.get("headline", "")[:200],
+                "sectionsCount": len(new_sections),
+            }, ensure_ascii=False))
+            return 0
 
     if isinstance(section_idx, int) and 0 <= section_idx < len(sections):
         # ── 섹션 1개만 수정 ──
