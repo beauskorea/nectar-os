@@ -1,5 +1,5 @@
 // Server-only Google Calendar wrapper using existing service account.
-// SA is already shared (readonly) to the two Beaus calendars for fetch_calendar.py.
+// SA is already shared (readonly) to the representative and Beaus calendars for fetch_calendar.py.
 // For insert/update we need "Make changes to events" on each calendar share.
 
 import crypto from "node:crypto";
@@ -10,6 +10,7 @@ const SA_PATH = "/root/.openclaw/workspace/data/google-calendar-sa.json";
 type SA = { client_email: string; private_key: string };
 
 export const CAL_ID: Record<string, string> = {
+  beauskorea: "beauskorea@gmail.com",
   beautysketch: "beautysketchkorea@gmail.com",
   beauscontents: "beauscontents@gmail.com",
 };

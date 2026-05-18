@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
 fetch_calendar.py — Google Calendar (SA) → public/events.json
-- Calendars: beautysketch / beauscontents / 한국 공휴일
+- Calendars: beauskorea / beautysketch / beauscontents / 한국 공휴일
 - Range: 오늘 기준 -60일 ~ +180일
-- Schema: [{id,title,start,end,allDay,cal}]  (cal = beautysketch|beauscontents|holiday)
+- Schema: [{id,title,start,end,allDay,cal}]  (cal = beauskorea|beautysketch|beauscontents|holiday)
 """
 import json, os, sys, traceback
 from datetime import datetime, timezone, timedelta
@@ -16,6 +16,7 @@ OUT = "/root/jinho-playground/public/events.json"
 SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
 CALENDARS = [
+    ("beauskorea",     "beauskorea@gmail.com"),
     ("beautysketch",   "beautysketchkorea@gmail.com"),
     ("beauscontents",  "beauscontents@gmail.com"),
     ("holiday",        "ko.south_korea#holiday@group.v.calendar.google.com"),
