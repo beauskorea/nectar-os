@@ -10,6 +10,7 @@ import DayBrief from "@/components/DayBrief";
 import QuickCapture from "@/components/QuickCapture";
 import HomeMeetingPulse from "@/components/HomeMeetingPulse";
 import HighlightsCard from "@/components/HighlightsCard";
+import HomeTeamCalendar from "@/components/HomeTeamCalendar";
 
 function Card({
   title,
@@ -86,10 +87,13 @@ export default function Today() {
       <QuickCapture />
 
       {/* ───── 📅 일정 & 미팅 펄스 ───── */}
-      <SectionLabel emoji="📅" title="일정 & 미팅" hint="다음 일정 · 이번주 패턴" />
-      <section className="grid grid-cols-1 lg:grid-cols-3 auto-rows-fr gap-4 mb-4">
-        <div className="lg:col-span-2 h-full"><NextEventsCard /></div>
-        <div className="h-full"><HomeMeetingPulse /></div>
+      <SectionLabel emoji="📅" title="일정 & 팀 캘린더" hint="내달력 · 팀별 시간표" />
+      <section className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] gap-4 mb-4 items-start">
+        <div className="h-full"><NextEventsCard /></div>
+        <div className="space-y-4">
+          <HomeTeamCalendar />
+          <HomeMeetingPulse />
+        </div>
       </section>
 
       {/* ───── 👥 사람 & 인박스 ───── */}
