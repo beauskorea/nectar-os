@@ -294,6 +294,9 @@ function MiddayView({ metrics }: { metrics: { past: number; upcoming: any[]; unr
 function EveningView({ e, stale }: { e: Evening; stale: boolean }) {
   const label = stale ? `어제 (${e.date}) 회고` : `오늘 (${e.date}) 회고`;
   const winsLabel = stale ? "✓ 어제 한 진전" : "✓ 오늘 한 진전";
+  const todayWins = Array.isArray(e.wrap.todayWins) ? e.wrap.todayWins : [];
+  const unfinished = Array.isArray(e.wrap.unfinished) ? e.wrap.unfinished : [];
+  const tomorrowFocus = Array.isArray(e.wrap.tomorrowFocus) ? e.wrap.tomorrowFocus : [];
   return (
     <>
       <div className="flex items-baseline gap-3 mb-3">
@@ -315,7 +318,7 @@ function EveningView({ e, stale }: { e: Evening; stale: boolean }) {
         <div>
           <p className="text-xs uppercase text-emerald-400 mb-2">{winsLabel}</p>
           <ul className="space-y-1.5">
-            {e.wrap.todayWins.map((w, i) => (
+            {todayWins.map((w, i) => (
               <li key={i} className="text-sm text-zinc-200">· {w}</li>
             ))}
           </ul>
@@ -323,7 +326,7 @@ function EveningView({ e, stale }: { e: Evening; stale: boolean }) {
         <div>
           <p className="text-xs uppercase text-amber-400 mb-2">… 미해결</p>
           <ul className="space-y-1.5">
-            {e.wrap.unfinished.map((w, i) => (
+            {unfinished.map((w, i) => (
               <li key={i} className="text-sm text-zinc-300">· {w}</li>
             ))}
           </ul>
@@ -331,7 +334,7 @@ function EveningView({ e, stale }: { e: Evening; stale: boolean }) {
         <div>
           <p className="text-xs uppercase text-cyan-400 mb-2">→ {stale ? "오늘" : "내일"} 1순위</p>
           <ul className="space-y-1.5">
-            {e.wrap.tomorrowFocus.map((w, i) => (
+            {tomorrowFocus.map((w, i) => (
               <li key={i} className="text-sm text-zinc-200">· {w}</li>
             ))}
           </ul>
