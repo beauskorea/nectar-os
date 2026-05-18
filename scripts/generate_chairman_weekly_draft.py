@@ -410,6 +410,22 @@ def sections_to_sheet_text(sections):
     return "\n".join(out).strip()
 
 
+REDUNDANT_SECTION_NAMES = ("영업관리", "고정TF", "팔로업")
+REDUNDANT_SECTION_EMOJIS = ("💼", "🛠️", "🛠", "⭐")
+
+
+def is_redundant_section(section):
+    title = str(section.get("title", "")).replace(" ", "")
+    return (
+        section.get("emoji") in REDUNDANT_SECTION_EMOJIS
+        or any(name in title for name in REDUNDANT_SECTION_NAMES)
+    )
+
+
+def clean_sections(sections):
+    return [s for s in sections if not is_redundant_section(s)]
+
+
 def main():
     env = load_env()
     api_key = env.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
@@ -465,8 +481,8 @@ def main():
 
     prev = draft.get("prev_week_summary") or {}
     this = draft.get("this_week_plan") or {}
-    prev_sections = prev.get("sections") or []
-    this_sections = this.get("sections") or []
+    prev_sections = clean_sections(prev.get("sections") or [])
+    this_sections = clean_sections(this.get("sections") or [])
     prev_management = prev.get("management") or []
     this_management = this.get("management") or []
 

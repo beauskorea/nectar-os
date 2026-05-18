@@ -19,6 +19,8 @@ MODEL = "claude-sonnet-4-6"
 FALLBACK_MODEL = "claude-opus-4-7"
 
 DELETE_WORDS = ("삭제", "지워", "빼", "제거", "없애")
+REDUNDANT_SECTION_NAMES = ("영업관리", "고정TF", "팔로업")
+REDUNDANT_SECTION_EMOJIS = ("💼", "🛠️", "🛠", "⭐")
 
 
 def load_env():
@@ -79,13 +81,22 @@ def is_section_delete(prompt: str, *names: str) -> bool:
     return any(name.replace(" ", "") in compact for name in names) and any(w in prompt for w in DELETE_WORDS)
 
 
-def without_redundant_sections(sections, *names: str, emojis=()):
-    compact_names = [name.replace(" ", "") for name in names]
+def is_redundant_section(section, *names: str, emojis=()):
+    compact_names = [name.replace(" ", "") for name in (names or REDUNDANT_SECTION_NAMES)]
+    section_emojis = emojis or REDUNDANT_SECTION_EMOJIS
+    title = str(section.get("title", "")).replace(" ", "")
+    return (
+        section.get("emoji") in section_emojis
+        or any(name in title for name in compact_names)
+    )
+
+
+def without_redundant_sections(sections, *names: str, emojis=(), only_empty=False):
     return [
         s for s in sections
         if not (
-            s.get("emoji") in emojis
-            or any(name in str(s.get("title", "")).replace(" ", "") for name in compact_names)
+            is_redundant_section(s, *names, emojis=emojis)
+            and (not only_empty or not str(s.get("body", "")).strip())
         )
     ]
 
@@ -146,7 +157,11 @@ def main():
         print(json.dumps({"ok": False, "error": f"scope {scope} not in draft"}, ensure_ascii=False))
         return 1
 
-    sections = block.get("sections") or []
+    original_sections = block.get("sections") or []
+    sections = without_redundant_sections(original_sections, only_empty=True)
+    removed_empty = len(sections) != len(original_sections)
+    block["sections"] = sections
+    block["sheetText"] = sections_to_sheet_text(sections)
 
     if is_section_delete(prompt, "영업관리", "영업 관리", "고정TF", "고정 TF", "팔로업"):
         new_sections = without_redundant_sections(
@@ -169,6 +184,17 @@ def main():
                 "sectionsCount": len(new_sections),
             }, ensure_ascii=False))
             return 0
+        if removed_empty:
+            DRAFT_PATH.write_text(json.dumps(draft, ensure_ascii=False, indent=2), encoding="utf-8")
+            print(json.dumps({
+                "ok": True,
+                "scope": scope,
+                "revised": "delete_empty_redundant_sections",
+                "sectionIndex": section_idx,
+                "headline": block.get("headline", "")[:200],
+                "sectionsCount": len(sections),
+            }, ensure_ascii=False))
+            return 0
 
     if isinstance(section_idx, int) and 0 <= section_idx < len(sections):
         # ── 섹션 1개만 수정 ──
@@ -189,6 +215,7 @@ def main():
             print(json.dumps({"ok": False, "error": f"claude failed: {e}"}, ensure_ascii=False))
             return 1
         sections[section_idx] = new_sec
+        sections = without_redundant_sections(sections, only_empty=True)
         block["sections"] = sections
         block["sheetText"] = sections_to_sheet_text(sections)
         revised_target = "section"
@@ -211,7 +238,7 @@ def main():
         if "headline" in new_block:
             block["headline"] = new_block["headline"]
         if "sections" in new_block and isinstance(new_block["sections"], list):
-            block["sections"] = new_block["sections"]
+            block["sections"] = without_redundant_sections(new_block["sections"], only_empty=True)
         block["sheetText"] = sections_to_sheet_text(block.get("sections") or [])
         revised_target = "full"
 
