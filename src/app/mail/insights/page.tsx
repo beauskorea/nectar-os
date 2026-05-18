@@ -78,11 +78,78 @@ type Proposal = {
   created_at: number;
 };
 
+type ProposalGroup = {
+  id: string;
+  brand: string;
+  proposals: Proposal[];
+  latestTs: number;
+  budget: string | null;
+  conditions: string | null;
+  deadline: string | null;
+  summary: string;
+};
+
+const PROPOSAL_TASKS_KEY = "nectar-mail-insights:proposal-tasks:v1";
+
+function normalizeKey(s: string | null | undefined): string {
+  return (s || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/[^\p{Letter}\p{Number}]+/gu, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function groupProposals(items: Proposal[]): ProposalGroup[] {
+  const byKey = new Map<string, Proposal[]>();
+  for (const p of items) {
+    const key = normalizeKey(p.brand) || normalizeKey(p.source_subject) || p.message_id;
+    byKey.set(key, [...(byKey.get(key) || []), p]);
+  }
+
+  return [...byKey.entries()]
+    .map(([id, proposals]) => {
+      const sorted = [...proposals].sort((a, b) => b.date_ts - a.date_ts);
+      const first = sorted[0];
+      return {
+        id,
+        brand: first.brand || "(브랜드 미상)",
+        proposals: sorted,
+        latestTs: first.date_ts,
+        budget: sorted.find((p) => p.budget)?.budget || null,
+        conditions: sorted.find((p) => p.conditions)?.conditions || null,
+        deadline: sorted.find((p) => p.deadline)?.deadline || null,
+        summary: first.summary,
+      };
+    })
+    .sort((a, b) => b.latestTs - a.latestTs);
+}
+
+function buildProposalTask(group: ProposalGroup): string {
+  const bits = [
+    group.budget ? `예산: ${group.budget}` : null,
+    group.deadline ? `마감: ${group.deadline}` : null,
+    group.conditions ? `조건: ${group.conditions}` : null,
+  ].filter(Boolean);
+  const suffix = bits.length ? ` — ${bits.join(" · ")}` : "";
+  return `[브랜드 제안] ${group.brand} 조건 검토${suffix}`;
+}
+
 function BrandProposalsSection() {
   const [items, setItems] = useState<Proposal[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [extractStatus, setExtractStatus] = useState<string | null>(null);
+  const [taskBusy, setTaskBusy] = useState<string | null>(null);
+  const [taskedIds, setTaskedIds] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      const raw = localStorage.getItem(PROPOSAL_TASKS_KEY);
+      return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
 
   const fetchCached = async () => {
     setLoading(true);
@@ -123,12 +190,53 @@ function BrandProposalsSection() {
     }
   };
 
+  const markTasked = (id: string) => {
+    setTaskedIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      try {
+        localStorage.setItem(PROPOSAL_TASKS_KEY, JSON.stringify([...next]));
+      } catch {}
+      return next;
+    });
+  };
+
+  const addToWeekly = async (group: ProposalGroup) => {
+    if (taskBusy) return;
+    setTaskBusy(group.id);
+    setErr(null);
+    try {
+      const r = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          text: buildProposalTask(group),
+          priority: group.deadline ? "high" : "med",
+          status: "todo",
+          board: "company",
+        }),
+      });
+      const j = await r.json();
+      if (!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
+      markTasked(group.id);
+    } catch (e) {
+      setErr(`체크리스트 추가 실패: ${String(e)}`);
+    } finally {
+      setTaskBusy(null);
+    }
+  };
+
   useEffect(() => { fetchCached(); }, []);
+
+  const groups = items ? groupProposals(items) : null;
 
   return (
     <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-semibold text-zinc-200">🆕 신규 브랜드 제안 — 예산·조건 추출</h2>
+        <div>
+          <h2 className="text-sm font-semibold text-zinc-200">🆕 신규 브랜드 제안 — 체크리스트 승격</h2>
+          <p className="text-[11px] text-zinc-500 mt-0.5">메일에서 예산·조건을 추출하고, 같은 브랜드 제안은 하나의 주간 체크리스트 태스크로 묶습니다.</p>
+        </div>
         <div className="flex items-center gap-2 text-[10px]">
           {extractStatus && <span className="text-zinc-500">{extractStatus}</span>}
           <button
@@ -147,31 +255,49 @@ function BrandProposalsSection() {
           아직 추출된 제안이 없어요. &quot;새 메일 추출&quot; 버튼을 누르면 sales/미분류 메일 중 예산·조건 키워드 있는 건을 LLM이 분석합니다.
         </p>
       )}
-      {items && items.length > 0 && (
+      {groups && groups.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          {items.map((p) => (
-            <div key={p.message_id} className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-3 text-xs space-y-1.5">
+          {groups.map((group) => {
+            const main = group.proposals[0];
+            const isTasked = taskedIds.has(group.id);
+            return (
+            <div key={group.id} className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-3 text-xs space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <span className="font-semibold text-emerald-300 truncate">
-                  {p.brand || "(브랜드 미상)"}
+                  {group.brand}
+                  {group.proposals.length > 1 && <span className="ml-1 text-[10px] text-zinc-500 font-normal">({group.proposals.length}건 병합)</span>}
                 </span>
                 <span className="text-[10px] text-zinc-500 font-mono shrink-0">
-                  {new Date(p.date_ts * 1000).toLocaleDateString("ko-KR", { month: "2-digit", day: "2-digit" })}
+                  {new Date(group.latestTs * 1000).toLocaleDateString("ko-KR", { month: "2-digit", day: "2-digit" })}
                 </span>
               </div>
-              <div className="text-zinc-300">{p.summary}</div>
+              <div className="text-zinc-300">{group.summary}</div>
               <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px]">
-                {p.budget && <div><span className="text-zinc-500">💰 </span><span className="text-amber-300">{p.budget}</span></div>}
-                {p.deadline && <div><span className="text-zinc-500">⏰ </span><span className="text-rose-300">{p.deadline}</span></div>}
-                {p.conditions && <div className="col-span-2"><span className="text-zinc-500">📋 </span><span className="text-zinc-300">{p.conditions}</span></div>}
+                {group.budget && <div><span className="text-zinc-500">💰 </span><span className="text-amber-300">{group.budget}</span></div>}
+                {group.deadline && <div><span className="text-zinc-500">⏰ </span><span className="text-rose-300">{group.deadline}</span></div>}
+                {group.conditions && <div className="col-span-2"><span className="text-zinc-500">📋 </span><span className="text-zinc-300">{group.conditions}</span></div>}
               </div>
-              <div className="flex items-center justify-between pt-1 border-t border-zinc-800/60">
-                <span className="text-[10px] text-zinc-600 truncate">{p.source_sender}</span>
-                <span className="text-[10px] text-zinc-700 font-mono">{p.model.replace("claude-", "").replace("sonar-", "")}</span>
+              <div className="rounded border border-amber-900/40 bg-amber-950/10 px-2 py-1.5 text-[11px] text-amber-100/90">
+                {buildProposalTask(group)}
               </div>
-              <div className="text-[10px] text-zinc-600 truncate">{p.source_subject}</div>
+              <div className="flex items-center gap-1.5 pt-1 border-t border-zinc-800/60">
+                <span className="text-[10px] text-zinc-600 truncate flex-1">{main.source_sender}</span>
+                <span className="text-[10px] text-zinc-700 font-mono">{main.model.replace("claude-", "").replace("sonar-", "")}</span>
+                <button
+                  onClick={() => addToWeekly(group)}
+                  disabled={taskBusy === group.id || isTasked}
+                  className={`px-2 py-0.5 rounded border text-[10px] transition disabled:opacity-70 ${
+                    isTasked
+                      ? "bg-emerald-900/40 border-emerald-800/60 text-emerald-300"
+                      : "bg-amber-900/40 border-amber-800/60 text-amber-200 hover:bg-amber-800/60"
+                  }`}
+                >
+                  {isTasked ? "✓ 체크리스트 추가됨" : taskBusy === group.id ? "추가 중…" : "+ 주간 체크리스트"}
+                </button>
+              </div>
+              <div className="text-[10px] text-zinc-600 truncate">{main.source_subject}</div>
             </div>
-          ))}
+          );})}
         </div>
       )}
     </section>
@@ -343,6 +469,9 @@ function DailySummaryCard({ label, date, autoLoad }: { label: string; date: stri
 
   useEffect(() => { if (autoLoad) load(false); }, [autoLoad, date]);
 
+  const isEmptySummary = !!summary && /분석 대상 메일이 없습니다/.test(summary);
+  if (isEmptySummary) return null;
+
   return (
     <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 flex flex-col">
       <div className="flex items-center justify-between mb-2">
@@ -371,8 +500,8 @@ function DailySummaryCard({ label, date, autoLoad }: { label: string; date: stri
           요약 생성
         </button>
       )}
-      {summary && <ActionableSummary text={summary} date={date} />}
-      {summary && <ChatBox date={date} label={label} />}
+      {summary && !isEmptySummary && <ActionableSummary text={summary} date={date} />}
+      {summary && !isEmptySummary && <ChatBox date={date} label={label} />}
     </section>
   );
 }
@@ -783,7 +912,6 @@ export default function MailInsightsPage() {
   };
 
   const today = isoKST(0);
-  const yesterday = isoKST(-1);
 
   return (
     <div className="px-6 py-8 max-w-[1400px] mx-auto">
@@ -810,10 +938,9 @@ export default function MailInsightsPage() {
 
       {data && (
         <div className="space-y-5">
-          {/* AI 일일 요약: 오늘 + 어제 */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          {/* AI 일일 요약: 오늘만. 빈 요약/히스토리는 메일 분석기 상단에서 숨김 */}
+          <div className="grid grid-cols-1 gap-5">
             <DailySummaryCard label="오늘" date={today} autoLoad={true} />
-            <DailySummaryCard label="어제" date={yesterday} autoLoad={true} />
           </div>
 
           {/* 🆕 신규 브랜드 제안 */}
