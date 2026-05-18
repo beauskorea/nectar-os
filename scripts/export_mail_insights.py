@@ -375,8 +375,8 @@ def build_sales_inbox(cur):
                 break
         if not tag:
             # fall back: 조아해 발신이면 to_raw(외부 수신자) 도메인이 진짜 영업 상대.
-            # 우리 회사 도메인(beaus, beauskorea, beautysketch) 은 skip.
-            INTERNAL = {"beaus", "beauskorea", "beautysketch", "beautysketchkorea", "gmail", "naver"}
+            # 우리 회사 도메인(beaus, beautysketch, beauscontents) 은 skip.
+            INTERNAL = {"beaus", "beauskorea", "beautysketch", "beautysketchkorea", "beauscontents", "gmail", "naver"}
             cand_domains = []
             to_raw = (r["to_raw"] or "").lower()
             for em in re.findall(r"[\w\.\-]+@[\w\.\-]+", to_raw):

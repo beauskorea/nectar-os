@@ -3,18 +3,18 @@ import { useState } from "react";
 
 const EVENT_KEY = "jinho-quick-events-v1";
 
-type Bucket = "beautysketch" | "beauskorea";
+type Bucket = "beautysketch" | "beauscontents";
 
 const BUCKETS: Array<{ key: Bucket; label: string; dot: string; active: string }> = [
   {
     key: "beautysketch",
-    label: "회사",
+    label: "뷰티스케치",
     dot: "bg-amber-400",
     active: "bg-amber-700/60 border-amber-500 text-amber-50",
   },
   {
-    key: "beauskorea",
-    label: "개인",
+    key: "beauscontents",
+    label: "콘텐츠",
     dot: "bg-cyan-400",
     active: "bg-cyan-700/60 border-cyan-500 text-cyan-50",
   },
@@ -127,7 +127,7 @@ export default function CalendarQuickAdd() {
       if (synced.length > 0 && failed.length === 0) {
         setMsg({
           kind: "ok",
-          text: `✅ Google ${bucket === "beautysketch" ? "회사" : "개인"} 캘린더에 ${synced.length}개 추가 — 화면 반영 최대 1분 (${synced.map(fmtPreview).join(" / ")})`,
+          text: `✅ Google ${bucket === "beautysketch" ? "뷰티스케치" : "콘텐츠"} 캘린더에 ${synced.length}개 추가 — 화면 반영 최대 1분 (${synced.map(fmtPreview).join(" / ")})`,
         });
       } else if (synced.length === 0) {
         // fallback to localStorage so the user at least sees it

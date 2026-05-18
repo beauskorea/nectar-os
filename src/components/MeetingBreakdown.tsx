@@ -455,8 +455,8 @@ export default function MeetingBreakdown({ events }: { events: CalEvent[] }) {
     }
     const cals: Record<string, number> = {};
     const calLabel: Record<string, string> = {
-      beautysketch: "회사",
-      beauskorea: "개인",
+      beautysketch: "뷰티스케치",
+      beauscontents: "콘텐츠",
       holiday: "공휴일",
       quick: "Quick(AI)",
     };
@@ -543,8 +543,8 @@ export default function MeetingBreakdown({ events }: { events: CalEvent[] }) {
 
   const maxCat = Math.max(1, ...Object.values(analysis.catCount));
   const calLabels: Record<string, { label: string; color: string }> = {
-    beautysketch: { label: "회사", color: "bg-amber-500" },
-    beauskorea: { label: "개인", color: "bg-cyan-500" },
+    beautysketch: { label: "뷰티스케치", color: "bg-amber-500" },
+    beauscontents: { label: "콘텐츠", color: "bg-cyan-500" },
     holiday: { label: "공휴일", color: "bg-rose-500" },
     quick: { label: "Quick (AI)", color: "bg-violet-500" },
   };

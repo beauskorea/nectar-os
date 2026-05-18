@@ -28,6 +28,13 @@ function formatTime(s: string, allDay: boolean) {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
+function classifyCompanyMeeting(title: string) {
+  if (/대표|전무|상무|이사|임원/.test(title)) return "임원";
+  if (/고문|자문|멘토/.test(title)) return "자문";
+  if (/주간|정기|고정|회의/.test(title)) return "정기";
+  return "미팅";
+}
+
 function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
@@ -37,8 +44,8 @@ function ymd(d: Date) {
 }
 
 const CAL_DOT: Record<string, string> = {
-  beauskorea: "bg-sky-400",
-  beautysketch: "bg-violet-400",
+  beautysketch: "bg-amber-400",
+  beauscontents: "bg-sky-400",
   holiday: "bg-rose-400",
   quick: "bg-amber-400",
   mock: "bg-zinc-500",
@@ -109,8 +116,11 @@ export default function NextEventsCard() {
   }, []);
 
   useEffect(() => {
-    setQuickEvents(loadQuick());
-    setHidden(loadHidden());
+    const t = window.setTimeout(() => {
+      setQuickEvents(loadQuick());
+      setHidden(loadHidden());
+    }, 0);
+    return () => window.clearTimeout(t);
   }, []);
 
   const events = useMemo(() => [...realEvents, ...quickEvents].filter(e => !hidden.includes(e.id)), [realEvents, quickEvents, hidden]);
@@ -124,6 +134,7 @@ export default function NextEventsCard() {
   const tomorrowList = events
     .filter((e) => isSameDay(parseDateLocal(e.start), tomorrowDate))
     .sort((a, b) => parseDateLocal(a.start).getTime() - parseDateLocal(b.start).getTime());
+  const todayCompanyList = todayList.filter((e) => e.cal !== "holiday");
 
   // mini calendar grid
   const firstOfMonth = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
@@ -305,6 +316,35 @@ export default function NextEventsCard() {
           </ul>
         </div>
       </div>
+
+      {todayCompanyList.length > 0 && (
+        <div className="mt-4 pt-3 border-t border-zinc-800">
+          <div className="flex items-baseline justify-between mb-2">
+            <p className="text-[10px] uppercase tracking-wider text-zinc-400">📋 오늘 전사 전체</p>
+            <span className="text-[10px] text-zinc-600 font-mono">{todayCompanyList.length} meetings</span>
+          </div>
+          <ul className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+            {todayCompanyList.map((e) => {
+              const label = classifyCompanyMeeting(e.title);
+              return (
+                <li
+                  key={`company-${e.id}`}
+                  className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-950/40 px-2.5 py-2"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${CAL_DOT[e.cal] || "bg-zinc-500"}`} />
+                    <span className="font-mono text-[11px] text-zinc-500 shrink-0">
+                      {formatTime(e.start, e.allDay)}
+                    </span>
+                    <span className="truncate text-xs text-zinc-200">{e.title}</span>
+                  </div>
+                  <span className="mt-1 inline-flex text-[10px] text-zinc-500">{label}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
 
       {/* mini calendar (펼치기) */}
       {expanded && (

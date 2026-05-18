@@ -14,7 +14,7 @@ PUB = Path('/root/jinho-playground/public/people.json')
 ARCH = Path('/root/jinho-playground/data/people_archive.json')
 
 
-SELF_EMAILS = {'ceo@beaus.co.kr','beauskorea@gmail.com','beautysketchkorea@gmail.com'}
+SELF_EMAILS = {'ceo@beaus.co.kr','beautysketchkorea@gmail.com','beauscontents@gmail.com'}
 SELF_NAMES = {'박진호','진호','Jinho Park','Jinho','jinho'}
 Y2026_CUTOFF = 1767193200  # 2026-01-01 KST
 STALE_DAYS = 9999  # disabled - now using Y2026 cutoff  # 6개월 이전 lastContact는 클리어 (잘못된 매칭 가능성 높음)

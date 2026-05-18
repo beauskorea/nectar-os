@@ -8,19 +8,19 @@ export type CalendarMeta = {
 };
 
 export const CALENDARS: Record<string, CalendarMeta> = {
-  beauskorea: {
-    key: "beauskorea",
-    label: "Jinho Park",
-    chipBg: "bg-cyan-700/70",
-    chipText: "text-cyan-50",
-    dotBg: "bg-cyan-400",
-  },
   beautysketch: {
     key: "beautysketch",
-    label: "beaus company",
+    label: "beautysketchkorea",
     chipBg: "bg-amber-700/70",
     chipText: "text-amber-50",
     dotBg: "bg-amber-400",
+  },
+  beauscontents: {
+    key: "beauscontents",
+    label: "beauscontents",
+    chipBg: "bg-cyan-700/70",
+    chipText: "text-cyan-50",
+    dotBg: "bg-cyan-400",
   },
   holiday: {
     key: "holiday",
@@ -38,7 +38,7 @@ export const CALENDARS: Record<string, CalendarMeta> = {
   },
 };
 
-export const CAL_ORDER: string[] = ["beauskorea", "beautysketch", "holiday", "quick"];
+export const CAL_ORDER: string[] = ["beautysketch", "beauscontents", "holiday", "quick"];
 
 export type CalEvent = {
   id: string;

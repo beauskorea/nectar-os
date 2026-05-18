@@ -27,7 +27,7 @@ SA_PATH = "/root/.openclaw/workspace/data/google-calendar-sa.json"
 INPUTS_DIR = ROOT / "data" / "chairman_inputs"
 INPUTS_DIR.mkdir(parents=True, exist_ok=True)
 ENV_FILES = ["/root/.openclaw/secrets/nerve.env", str(ROOT / ".env.local")]
-CAL_ID = "beauskorea@gmail.com"
+CAL_ID = "beauscontents@gmail.com"
 TZ = "Asia/Seoul"
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
 

@@ -158,7 +158,7 @@ export default function QuickCapture() {
         start,
         end,
         allDay,
-        cal: "beauskorea",
+        cal: "beauscontents",
       },
       ...events,
     ];
